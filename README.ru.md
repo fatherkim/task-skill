@@ -144,6 +144,13 @@ python3 agent_tasks/_cli.py calibrate --set "sonnet:23300,opus:18100"
   своему расположению, `verify` берёт префикс динамически. Переименование —
   только в паузе (нет in_progress/worktree), через `git mv`.
 - Нумерация задач без потолка (`\d{4,}`, сортировка числовая).
-- Происхождение: порт скилла fable-ruki-agenty с GitHub Issues на локальный
-  файловый трекер; требования — без сети/gh, кросс-поддержка Claude Code
-  (терминал / VS Code / Desktop), Codex, Cursor.
+
+## Происхождение и лицензия
+
+Проект начался как порт скилла `fable-ruki-agenty` из репозитория
+[serejaris/personal-corp-skills](https://github.com/serejaris/personal-corp-skills/) —
+перенос с GitHub Issues на локальный файловый трекер; требования — без
+сети/gh, кросс-поддержка Claude Code (терминал / VS Code / Desktop), Codex,
+Cursor.
+
+Лицензия: [MIT](LICENSE).

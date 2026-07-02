@@ -149,6 +149,13 @@ Requirements: Python 3 (stdlib only), git.
   anchored to its own location and `verify` derives the prefix dynamically.
   Rename only while paused (no in-progress tasks or worktrees), via `git mv`.
 - Task numbering has no ceiling (`\d{4,}`, numeric sort).
-- Origin: a port of the fable-ruki-agenty skill from GitHub Issues to a local
-  file tracker; requirements were: no network/gh, and cross-tool support for
-  Claude Code (terminal / VS Code / Desktop), Codex, and Cursor.
+
+## Origin and license
+
+This project started as a port of the `fable-ruki-agenty` skill from
+[serejaris/personal-corp-skills](https://github.com/serejaris/personal-corp-skills/),
+moving it from GitHub Issues to a local file tracker; requirements were: no
+network/gh, and cross-tool support for Claude Code (terminal / VS Code /
+Desktop), Codex, and Cursor.
+
+License: [MIT](LICENSE).
