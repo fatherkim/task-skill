@@ -34,20 +34,99 @@ are in Russian.*
   splits the spend into work vs spawn initialization (constants come from
   `calibrate --set`); init share >30% ⇒ tasks are too small.
 
+## Design decisions (from DESIGN.md)
+
+Why this shape and not the obvious alternatives:
+
+- **One file per task + a mini-CLI** — not a single BACKLOG.md, not SQLite, not
+  an off-the-shelf tracker. One file = no conflicts under parallel work;
+  markdown = human-readable diffs and specs you can edit as text; a stdlib-only
+  CLI runs everywhere. On `init` the CLI copies itself into the tracker dir
+  (`agent_tasks/_cli.py`) — the project is self-contained, every tool calls the
+  same script.
+- **Only the orchestrator mutates the tracker dir** (executors are forbidden),
+  and **statuses change only through the CLI** (`open → in_progress → done`,
+  plus `blocked`) — that's what keeps the generated index conflict-free and in
+  sync by construction.
+- **`ready` encodes scheduling deterministically**: dependencies done AND
+  declared `files` don't intersect any in-progress task; it also warns about
+  intersections among ready tasks. The weak link is completeness of `files` —
+  fill it via impact analysis.
+- **Execution mode**: the user's directive ("parallel"/"sequential") has top
+  priority; the default is sequential. Parallel ⇒ git worktrees are mandatory
+  even for two agents — branches isolate history, NOT the working directory
+  (a shared dir means mixed edits and a race for the git index). Sequential ⇒
+  main tree, branch `task/NNNN`. A branch per task is always required: `verify`
+  and rollback hang off it. The directive never overrides safety: tasks with
+  intersecting `files` run sequentially regardless.
+- **`verify` is deterministic scope control** (`git diff main...task/NNNN`
+  against declared `files`): it catches edits outside the spec and touches to
+  the tracker dir. It exists because envelope prohibitions are instructions,
+  not mechanisms. The `tests/` prefix is allowed by default (`--allow` is
+  configurable).
+- **Model defaults live in the skill text** (haiku for reading / sonnet for
+  code), overridable per invocation. A config file was consciously rejected as
+  an extra entity.
+
+## Rules born from incidents
+
+Each of these came from an actual failure during battle-testing, not from
+speculation:
+
+1. **Commit the tracker dir BEFORE creating a worktree** — a worktree branches
+   from HEAD; an uncommitted spec is invisible to the executor.
+2. **`git worktree remove --force`** — plain remove fails on test artifacts
+   (`__pycache__` etc.); a `.gitignore` is mandatory.
+3. **Anti-fabrication acceptance** — an executor twice reported tests that
+   didn't exist or were never run. Hence: every criterion is a file:test link,
+   existence is grep-checked, passing is verified by an actual run. A claimed
+   but missing test = the task goes back.
+4. **All executor work must be committed before reporting** — uncommitted work
+   doesn't exist for `verify`/merge. The orchestrator commits the tracker dir
+   after every `close` — its git history is the pipeline journal.
+5. **Symbol-level tooling (e.g. Serena MCP) activates on the worktree's own
+   path**, not the main tree's.
+6. **MCP tools proportionally, not ritually** — tools cost context on every
+   spawn; small edits go through plain edit. The orchestrator can prescribe
+   tooling in the spec.
+
+## Token economics
+
+`--spent "sonnet(2):34k,serena(2):2k"` — parentheses = number of spawns (for
+MCP keys: spawns with the tool connected, NOT call counts — the constant is the
+price of loading the tools into context). Numbers come only from tool counters;
+no counter ⇒ the field is omitted, never invented. We account for what was
+*spent*, not what was "saved" (savings are a counterfactual, measurable only
+against a baseline).
+
+**Calibration**: a trivial subagent per configuration ⇒ its input tokens = the
+spawn constant; an MCP constant = the difference (with − without). Constants
+live in `_CONSTANTS.md` next to the tasks, not in the skill folder (after
+`init` the CLI doesn't know the skill path; Codex/Cursor don't have one; the
+tool set is a property of the project). `stats` then decomposes spend into work
+(model-invariant) vs initialization (spawns × constant). If the init share is
+consistently >30%, the tasks are too small — coarsen the decomposition. The
+estimate ignores prompt caching and differing iteration counts between models.
+
 ## Install
 
 Claude Code: copy `.claude/skills/task/` into the root of your repository —
 the skill is picked up as `/task`. On first use the CLI bootstraps itself into
 the tracker directory (`agent_tasks/_cli.py`).
 
-Codex / Cursor (no subagents):
+Codex reads skills natively from `.agents/skills/` — a symlink
+`.agents/skills/task → ../../.claude/skills/task` gives a single source of
+truth. Fallback path for Codex/Cursor without skill support:
 
 ```sh
 python3 .claude/skills/task/scripts/sync_rules.py --repo /path/to/repo
 ```
 
-— extracts the tool-agnostic core of SKILL.md into `AGENTS.md` and
-`.cursor/rules/task.mdc`.
+— extracts the tool-agnostic core of SKILL.md (between `core:start`/`core:end`
+markers) into `AGENTS.md` and `.cursor/rules/task.mdc`. In tools without
+subagents the orchestrator and executor roles run sequentially in one session
+or in separate tabs; the executor envelope and all prohibitions apply
+unchanged.
 
 ## CLI
 
@@ -63,3 +142,13 @@ python3 agent_tasks/_cli.py calibrate --set "sonnet:23300,opus:18100"
 ```
 
 Requirements: Python 3 (stdlib only), git.
+
+## Notes and boundaries
+
+- The tracker directory is renameable (`tasks/` → `agent_tasks/`): the CLI is
+  anchored to its own location and `verify` derives the prefix dynamically.
+  Rename only while paused (no in-progress tasks or worktrees), via `git mv`.
+- Task numbering has no ceiling (`\d{4,}`, numeric sort).
+- Origin: a port of the fable-ruki-agenty skill from GitHub Issues to a local
+  file tracker; requirements were: no network/gh, and cross-tool support for
+  Claude Code (terminal / VS Code / Desktop), Codex, and Cursor.
