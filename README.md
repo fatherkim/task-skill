@@ -1,65 +1,65 @@
-# task — конвейер «оркестратор + руки-агенты»
+# task — orchestrator + coder-subagents pipeline
 
-Skill для Claude Code: декомпозиция работы на задачи в локальном файловом
-трекере (`agent_tasks/*.md` + мини-CLI на stdlib-Python) и раздача их кодящим
-субагентам. Без GitHub Issues, без внешних зависимостей.
+A Claude Code skill: decompose work into tasks in a local file-based tracker
+(`agent_tasks/*.md` + a stdlib-only Python mini-CLI) and dispatch them to
+coding subagents. No GitHub Issues, no external dependencies.
 
-*Claude Code skill: multi-agent task decomposition with a local markdown task
-tracker and a stdlib-only Python CLI. Docs are in Russian.*
+*Русская версия: [README.ru.md](README.ru.md). Skill docs (SKILL.md, DESIGN.md)
+are in Russian.*
 
-## Что внутри
+## What's inside
 
 ```
 .claude/skills/task/
-├── SKILL.md              # сам скилл (канонический текст)
-├── DESIGN.md             # журнал проектных решений (почему так)
+├── SKILL.md              # the skill itself (canonical text)
+├── DESIGN.md             # design log (why it is the way it is)
 └── scripts/
-    ├── task.py           # мини-CLI трекера (new/list/start/close/verify/ready/stats/calibrate)
-    └── sync_rules.py     # генерация правил для Codex (AGENTS.md) и Cursor (.cursor/rules)
+    ├── task.py           # tracker mini-CLI (new/list/start/close/verify/ready/stats/calibrate)
+    └── sync_rules.py     # generates rules for Codex (AGENTS.md) and Cursor (.cursor/rules)
 ```
 
-## Ключевые идеи
+## Key ideas
 
-- **Оркестратор не пишет код.** Он декомпозирует, диспатчит субагентов
-  (haiku-читатели, sonnet-кодеры), принимает работу и двигает статусы.
-- **Файл-на-задачу** в `agent_tasks/NNNN-slug.md` с frontmatter
-  (status/files/depends/spent) — merge-конфликтов между задачами нет.
-- **`_INDEX.md` — генерируемый артефакт**: ориентация по очереди в ~40-50 раз
-  дешевле чтения всех спек.
-- **4 слоя защиты от коллизий**: `ready` (предотвращение), worktree (изоляция),
-  `verify` (контроль скоупа диффа), merge-конфликт (детекция).
-- **Анти-фабрикация приёмки**: каждый критерий = ссылка file:test, существование
-  проверяется grep-ом, прохождение — реальным прогоном.
-- **Учёт токенов**: `close N --spent "sonnet(2):141k,opus(1):59k"`, `stats`
-  раскладывает расход на работу и инициализацию спавнов (константы —
-  `calibrate --set`), доля инициализации >30% ⇒ задачи слишком мелкие.
+- **The orchestrator writes no code.** It decomposes, dispatches subagents
+  (haiku readers, sonnet coders), accepts the work, and moves statuses.
+- **One file per task** in `agent_tasks/NNNN-slug.md` with frontmatter
+  (status/files/depends/spent) — no merge conflicts between tasks.
+- **`_INDEX.md` is a generated artifact**: orienting via the index is ~40-50×
+  cheaper than reading all the specs.
+- **4 layers of collision protection**: `ready` (prevention), git worktrees
+  (isolation), `verify` (diff scope control), merge conflicts (detection).
+- **Anti-fabrication acceptance**: every criterion = a file:test link, existence
+  is checked with grep, passing is checked by an actual run.
+- **Token accounting**: `close N --spent "sonnet(2):141k,opus(1):59k"`; `stats`
+  splits the spend into work vs spawn initialization (constants come from
+  `calibrate --set`); init share >30% ⇒ tasks are too small.
 
-## Установка
+## Install
 
-Claude Code: скопировать `.claude/skills/task/` в корень своего репозитория —
-скилл подхватится как `/task`. При первом использовании CLI бутстрапится в
-трекер-каталог (`agent_tasks/_cli.py`).
+Claude Code: copy `.claude/skills/task/` into the root of your repository —
+the skill is picked up as `/task`. On first use the CLI bootstraps itself into
+the tracker directory (`agent_tasks/_cli.py`).
 
-Codex / Cursor (без субагентов):
+Codex / Cursor (no subagents):
 
 ```sh
 python3 .claude/skills/task/scripts/sync_rules.py --repo /path/to/repo
 ```
 
-— извлечёт инструментонезависимое ядро из SKILL.md в `AGENTS.md` и
+— extracts the tool-agnostic core of SKILL.md into `AGENTS.md` and
 `.cursor/rules/task.mdc`.
 
 ## CLI
 
 ```sh
-python3 agent_tasks/_cli.py new "Заголовок" --files a.c,b.h --depends 0001
+python3 agent_tasks/_cli.py new "Title" --files a.c,b.h --depends 0001
 python3 agent_tasks/_cli.py list|index
 python3 agent_tasks/_cli.py start 0002
 python3 agent_tasks/_cli.py verify 0002 [--base main] [--allow tests/]
 python3 agent_tasks/_cli.py close 0002 --spent "sonnet(1):69k"
-python3 agent_tasks/_cli.py ready          # что можно брать без коллизий
-python3 agent_tasks/_cli.py stats          # экономика конвейера
+python3 agent_tasks/_cli.py ready          # what can be taken without collisions
+python3 agent_tasks/_cli.py stats          # pipeline economics
 python3 agent_tasks/_cli.py calibrate --set "sonnet:23300,opus:18100"
 ```
 
-Требования: Python 3 (stdlib), git.
+Requirements: Python 3 (stdlib only), git.
