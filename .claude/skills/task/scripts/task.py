@@ -555,9 +555,20 @@ def cmd_verify(args):
     changed = set(l.strip() for l in out.splitlines() if l.strip())
     tprefix = os.path.basename(os.path.abspath(d).rstrip("/")) + "/"
     tasks_touched = sorted(f for f in changed if f.startswith(tprefix))
-    undeclared = sorted(f for f in changed - declared
-                        if not f.startswith(tprefix) and not f.startswith(allow))
-    missing = sorted(declared - changed)
+    # Префикс-матч каталогов (files-запись, оканчивающаяся на "/", покрывает
+    # все вложенные файлы) — задача 0021, регрессировало при sync из task.py
+    # в 0024, восстановлено в 0028. НЕ ТЕРЯТЬ при sync из task.py (и обратно).
+    dir_prefixes = tuple(p for p in declared if p.endswith("/"))
+
+    def covered(f):
+        return f in declared or f.startswith(dir_prefixes) if dir_prefixes else f in declared
+
+    undeclared = sorted(f for f in changed
+                        if not covered(f) and not f.startswith(tprefix)
+                        and not f.startswith(allow))
+    missing = sorted(p for p in declared
+                     if p not in changed
+                     and not (p.endswith("/") and any(f.startswith(p) for f in changed)))
     print("Задача %s, дифф %s...%s" % (meta["id"], args.base, branch))
     print("  изменено файлов: %d; заявлено в спеке: %d" % (len(changed), len(declared)))
     if missing:
