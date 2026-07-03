@@ -125,7 +125,8 @@ Borrowed after a review-side analysis of
   silently died" is an unconditional return.
 - **Reviewer envelope** — review is refutation, not summary: the change is
   framed as a claim to attack, with hunt categories per change type and a
-  CONFIRMED (file:line) / NO FINDINGS verdict per category.
+  CONFIRMED (file:line) / NO FINDINGS verdict per category, with an explicit
+  not-a-finding list (pre-existing, compiler-caught, spec-mandated changes).
 - **Merge review** — the orchestrator's own merge/fixup commits are reviewed
   by a reading subagent, not their author: no single executor ever saw the
   merged result.
