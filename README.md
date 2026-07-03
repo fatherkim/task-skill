@@ -119,7 +119,8 @@ Borrowed after a review-side analysis of
 [alexxety/multi-model-pipeline-skill](https://github.com/alexxety/multi-model-pipeline-skill)
 — their strength (independent, adversarial review) was this skill's weak half:
 
-- **Debt from review** — material non-blocking findings don't die in
+- **Debt from review and reports** — material non-blocking findings (from the
+  reviewer or the executor's "Adjacent findings" section) don't die in
   acceptance notes: each one becomes a `new` debt task linked from the note.
   "We'll wire it later" without a tracked task does not exist.
 - **Vacuous-pass control** — a green test is not evidence: a new guard test
