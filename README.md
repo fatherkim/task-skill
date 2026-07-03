@@ -134,6 +134,13 @@ Borrowed after a review-side analysis of
   merged result.
 - **Hypothesis labeling** — unverified context in a spec is marked as a
   hypothesis ("likely X — verify before relying"), never stated as fact.
+- **Executor self-refutation** — before the final report the executor attacks
+  its own work: adversarial pass over the acceptance criteria plus a grep for
+  old-behavior wording left in comments/docs of touched files.
+- **Flag, don't fix** — adjacent problems outside the task scope go into a
+  dedicated "Adjacent findings (not fixed)" report section; material ones
+  become tracked debt tasks. A spec "fact" that contradicts the live code is
+  a blocker, not something to build on.
 
 Considered and deferred: cross-vendor review (Codex read-only vs a
 Claude-driven pipeline) — candidate escalation for high-risk tasks.
