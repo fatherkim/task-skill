@@ -14,7 +14,7 @@ are in Russian.*
 ├── SKILL.md              # the skill itself (canonical text)
 ├── DESIGN.md             # design log (why it is the way it is)
 └── scripts/
-    ├── task.py           # tracker mini-CLI (new/list/start/close/verify/ready/stats/calibrate)
+    ├── task.py           # tracker mini-CLI (new/list/start/close/verify/ready/stats/calibrate/archive)
     └── sync_rules.py     # generates rules for Codex (AGENTS.md) and Cursor (.cursor/rules)
 ```
 
@@ -33,6 +33,8 @@ are in Russian.*
 - **Token accounting**: `close N --spent "sonnet(2):141k,opus(1):59k"`; `stats`
   splits the spend into work vs spawn initialization (constants come from
   `calibrate --set`); init share >30% ⇒ tasks are too small.
+- **Archival compaction**: closed tasks compact into `_ARCHIVE.md` digests —
+  orientation cost doesn't grow with history.
 
 ## Design decisions (from DESIGN.md)
 
@@ -185,6 +187,7 @@ python3 agent_tasks/_cli.py close 0002 --spent "sonnet(1):69k"
 python3 agent_tasks/_cli.py ready          # what can be taken without collisions
 python3 agent_tasks/_cli.py stats          # pipeline economics
 python3 agent_tasks/_cli.py calibrate --set "sonnet:23300,opus:18100"
+python3 agent_tasks/_cli.py archive 0001 --summary "..."  # or `archive --done`
 ```
 
 Requirements: Python 3 (stdlib only), git.

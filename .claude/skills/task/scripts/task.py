@@ -19,6 +19,7 @@ import sys
 
 STATUSES = ("open", "in_progress", "blocked", "done")
 STATUS_ORDER = {"in_progress": 0, "blocked": 1, "open": 2, "done": 3}
+ARCHIVE_HINT = 50  # порог живых done, при котором подсказываем `archive --done`
 
 TEMPLATE = """## Задача
 <что сделать и зачем — 2–5 предложений>
@@ -96,6 +97,19 @@ def all_tasks(d):
     return items
 
 
+def archived_tasks(d):
+    """Задачи, уже перенесённые в <tracker>/archive/ (read-only)."""
+    adir = os.path.join(d, "archive")
+    items = []
+    if not os.path.isdir(adir):
+        return items
+    for name in sorted(os.listdir(adir)):
+        if re.match(r"^\d{4}-.*\.md$", name):
+            meta, _ = parse_task(os.path.join(adir, name))
+            items.append(meta)
+    return items
+
+
 def csv(meta, key):
     return [x.strip() for x in meta.get(key, "").split(",") if x.strip()]
 
@@ -105,7 +119,21 @@ def find(d, tid):
     for name in sorted(os.listdir(d)):
         if name.startswith(tid + "-") and name.endswith(".md"):
             return os.path.join(d, name)
-    sys.exit("Задача %s не найдена." % tid)
+    sys.exit("Задача %s не найдена (возможно, в archive/ — см. _ARCHIVE.md)." % tid)
+
+
+def find_any(d, tid):
+    """Сначала живой каталог, затем archive/. Возвращает (path, is_archived)."""
+    tid = "%04d" % int(tid)
+    for name in sorted(os.listdir(d)):
+        if name.startswith(tid + "-") and name.endswith(".md"):
+            return os.path.join(d, name), False
+    adir = os.path.join(d, "archive")
+    if os.path.isdir(adir):
+        for name in sorted(os.listdir(adir)):
+            if name.startswith(tid + "-") and name.endswith(".md"):
+                return os.path.join(adir, name), True
+    sys.exit("Задача %s не найдена (возможно, в archive/ — см. _ARCHIVE.md)." % tid)
 
 
 # ---------- индекс ----------
@@ -140,6 +168,18 @@ def regen_index(d):
     ]
     lines += table(active)
     lines += ["", "**Done (%d):** %s" % (len(done), ", ".join(t.get("id", "?") for t in done) or "—"), ""]
+    archived = archived_tasks(d)
+    if archived:
+        atotal = 0
+        for t in archived:
+            if t.get("spent"):
+                tt, _ = _parse_spent(t["spent"])
+                atotal += sum(tt.values())
+        if atotal:
+            lines.append("**Архив (%d):** ~%s токенов — см. _ARCHIVE.md" % (len(archived), "{:,}".format(atotal)))
+        else:
+            lines.append("**Архив (%d):** — см. _ARCHIVE.md" % len(archived))
+        lines.append("")
     with open(os.path.join(d, "_INDEX.md"), "w", encoding="utf-8") as f:
         f.write("\n".join(lines))
 
@@ -160,7 +200,7 @@ def cmd_init(args):
 
 def cmd_new(args):
     d = tasks_dir()
-    ids = [int(t["id"]) for t in all_tasks(d) if t.get("id", "").isdigit()]
+    ids = [int(t["id"]) for t in all_tasks(d) + archived_tasks(d) if t.get("id", "").isdigit()]
     nid = "%04d" % (max(ids) + 1 if ids else 1)
     title = " ".join(args.title).strip()
     path = os.path.join(d, "%s-%s.md" % (nid, slugify(title)))
@@ -186,7 +226,10 @@ def cmd_list(args):
 
 def cmd_view(args):
     d = tasks_dir()
-    with open(find(d, args.id), encoding="utf-8") as f:
+    path, is_archived = find_any(d, args.id)
+    if is_archived:
+        print("[архив]")
+    with open(path, encoding="utf-8") as f:
         print(f.read())
 
 
@@ -230,6 +273,92 @@ def cmd_close(args):
     write_task(path, meta, body.rstrip() + "\n\n" + note + "\n")
     regen_index(d)
     print("%s -> done" % meta.get("id"))
+    live_done = sum(1 for t in all_tasks(d) if t.get("status") == "done")
+    if live_done >= ARCHIVE_HINT:
+        print("Подсказка: done-задач %d — сожми историю: python3 %s/_cli.py archive --done" % (
+            live_done, os.path.basename(os.path.abspath(d).rstrip("/"))))
+
+
+ARCHIVE_FILE = "_ARCHIVE.md"
+
+
+def _fallback_summary(body):
+    """Первое предложение текста после ПОСЛЕДНЕГО заголовка `## Приёмка ...`."""
+    matches = list(re.finditer(r"## Приёмка[^\n]*\n+(.+?)(?:[.;]\s|\n)", body, re.S))
+    if matches:
+        return matches[-1].group(1).strip()
+    return "приёмка не записана"
+
+
+def _load_archive_entries(d):
+    """id -> полный текст записи (bullet), из существующего _ARCHIVE.md."""
+    path = os.path.join(d, ARCHIVE_FILE)
+    entries = {}
+    if not os.path.exists(path):
+        return entries
+    with open(path, encoding="utf-8") as f:
+        text = f.read()
+    for m in re.finditer(r"- \*\*(\d{4})\*\*.*?(?=\n- \*\*\d{4}\*\*|\Z)", text, re.S):
+        entries[m.group(1)] = m.group(0).rstrip("\n")
+    return entries
+
+
+def _archive_entry_line(meta, summary):
+    date = datetime.date.today().isoformat()
+    line = "- **%s** %s" % (meta.get("id"), meta.get("title", ""))
+    if meta.get("spent"):
+        line += " — spent %s" % meta["spent"]
+    line += " — архив %s. %s" % (date, summary)
+    return line
+
+
+def _write_archive_file(d, entries):
+    path = os.path.join(d, ARCHIVE_FILE)
+    lines = [
+        "# Архив задач",
+        "",
+        "> Генерируется CLI (archive). Руками не редактировать.",
+        "",
+    ]
+    for tid in sorted(entries):
+        lines.append(entries[tid])
+    with open(path, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines) + "\n")
+
+
+def _do_archive_one(d, tid, summary=None):
+    path = find(d, tid)
+    meta, body = parse_task(path)
+    if meta.get("status") != "done":
+        sys.exit("Задача %s: архивируются только done." % meta.get("id"))
+    if not summary:
+        summary = _fallback_summary(body)
+    adir = os.path.join(d, "archive")
+    os.makedirs(adir, exist_ok=True)
+    dst = os.path.join(adir, os.path.basename(path))
+    os.replace(path, dst)
+    entries = _load_archive_entries(d)
+    entries[meta["id"]] = _archive_entry_line(meta, summary)
+    _write_archive_file(d, entries)
+    regen_index(d)
+    print("%s -> archive/" % meta["id"])
+
+
+def cmd_archive(args):
+    d = tasks_dir()
+    if args.done:
+        if args.id:
+            sys.exit("id и --done взаимоисключимы.")
+        if args.summary:
+            sys.exit("--summary только при одиночном id.")
+        done_ids = [t["id"] for t in all_tasks(d) if t.get("status") == "done"]
+        for tid in done_ids:
+            _do_archive_one(d, tid)
+        print("архивировано %d задач" % len(done_ids))
+    else:
+        if not args.id:
+            sys.exit("Укажи ID задачи или --done.")
+        _do_archive_one(d, args.id, args.summary)
 
 
 def _parse_spent(s):
@@ -308,12 +437,14 @@ def cmd_calibrate(args):
 def cmd_stats(args):
     d = tasks_dir()
     tasks = all_tasks(d)
+    archived = archived_tasks(d)
     by_status = {}
     by_model = {}
     spawns = {}
     tracked = 0
     for t in tasks:
         by_status[t.get("status", "?")] = by_status.get(t.get("status", "?"), 0) + 1
+    for t in tasks + archived:
         if t.get("spent"):
             tracked += 1
             tt, cc = _parse_spent(t["spent"])
@@ -325,8 +456,12 @@ def cmd_stats(args):
             tt, _ = _parse_spent(t["spawns"])
             for m, n in tt.items():
                 spawns[m] = spawns.get(m, 0) + n
-    print("Задач: %d  (%s)" % (len(tasks),
-          ", ".join("%s: %d" % kv for kv in sorted(by_status.items()))))
+    print("Задач: %d  (%s)  archived: %d" % (len(tasks),
+          ", ".join("%s: %d" % kv for kv in sorted(by_status.items())), len(archived)))
+    live_done = by_status.get("done", 0)
+    if live_done >= ARCHIVE_HINT:
+        print("Подсказка: done-задач %d — сожми историю: python3 %s/_cli.py archive --done" % (
+            live_done, os.path.basename(os.path.abspath(d).rstrip("/"))))
     if by_model:
         total = sum(by_model.values())
         print("Потрачено токенов (по %d задачам с учётом): %s  итого ~%s" % (
@@ -363,6 +498,10 @@ def cmd_stats(args):
         idx_size = os.path.getsize(idx)
         full = sum(os.path.getsize(os.path.join(d, n)) for n in os.listdir(d)
                    if re.match(r"^\d{4}-.*\.md$", n))
+        adir = os.path.join(d, "archive")
+        if os.path.isdir(adir):
+            full += sum(os.path.getsize(os.path.join(adir, n)) for n in os.listdir(adir)
+                        if re.match(r"^\d{4}-.*\.md$", n))
         if full:
             print("Ориентация по индексу vs чтение всех спек: %s vs %s байт (x%.1f)" % (
                 "{:,}".format(idx_size), "{:,}".format(full), full / max(idx_size, 1)))
@@ -372,6 +511,7 @@ def cmd_ready(args):
     d = tasks_dir()
     tasks = all_tasks(d)
     done = set(t["id"] for t in tasks if t.get("status") == "done")
+    done |= {t["id"] for t in archived_tasks(d)}
     busy = set()
     for t in tasks:
         if t.get("status") == "in_progress":
@@ -487,12 +627,18 @@ def main():
     sub.add_parser("ready", help="что можно диспатчить (deps выполнены, файлы свободны)")
     sub.add_parser("index", help="перегенерировать _INDEX.md")
 
+    p = sub.add_parser("archive", help="сжать done-задачу(и): файл -> archive/, выжимка -> _ARCHIVE.md")
+    p.add_argument("id", nargs="?", help="ID одной задачи (взаимоисключимо с --done)")
+    p.add_argument("--summary", help="выжимка 2-3 строки (только при одиночном id; иначе авто-fallback из ## Приёмка)")
+    p.add_argument("--done", action="store_true", help="архивировать разом все текущие done-задачи (fallback-выжимка)")
+
     args = ap.parse_args()
     {
         "init": cmd_init, "new": cmd_new, "list": cmd_list, "view": cmd_view,
         "start": cmd_start, "block": cmd_block, "unblock": cmd_unblock,
         "close": cmd_close, "ready": cmd_ready, "index": cmd_index,
         "verify": cmd_verify, "stats": cmd_stats, "calibrate": cmd_calibrate,
+        "archive": cmd_archive,
     }[args.cmd](args)
 
 
