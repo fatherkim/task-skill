@@ -87,8 +87,53 @@ speculation:
 5. **Symbol-level tooling (e.g. Serena MCP) activates on the worktree's own
    path**, not the main tree's.
 6. **MCP tools proportionally, not ritually** — tools cost context on every
-   spawn; small edits go through plain edit. The orchestrator can prescribe
-   tooling in the spec.
+   spawn; small edits go through plain edit. The orchestrator prescribes
+   tooling in the spec **with a reason** ("Serena not needed: small files" /
+   "edits via Serena: rename with 40+ references"), and the executor reports
+   whether it was used and why — accumulated reasons calibrate this very rule.
+7. **Wiring rule** — twice in one day an executor shipped a module with a new
+   API without hooking it into the main loop ("deferred wire, trivial
+   follow-up"): green unit tests, dead feature in firmware. Root cause was the
+   decomposition: `files` didn't include the integration point. Hence: the
+   consumer goes into `files`, e2e observability goes into the criteria.
+8. **Shared-resource rule** — a parallel-wave executor grabbed a namespace
+   already claimed by a sibling task with the opposite factory-reset semantics;
+   `ready` passed it — the files didn't intersect. Hence: pin allocations
+   (namespaces, key ranges, register addresses) to concrete values in the spec;
+   for a parallel wave, a shared allocation map.
+9. **Symmetric-cases rule** — the spec flagged a race for one register, the
+   executor fixed exactly that one and missed the mirror register with the same
+   race (the reviewer disproved it experimentally). An executor fixes the
+   letter of the spec — enumerating symmetric cases is the orchestrator's job.
+10. **Deletion-sweep rule** — after a component was removed, present-tense
+    descriptions of it survived across README and header comments. A task that
+    deletes or renames a component includes docs/comments in `files` and a
+    repo-wide grep in the criteria; historical "formerly/dropped" mentions are
+    fine.
+
+## Review discipline
+
+Borrowed after a review-side analysis of
+[alexxety/multi-model-pipeline-skill](https://github.com/alexxety/multi-model-pipeline-skill)
+— their strength (independent, adversarial review) was this skill's weak half:
+
+- **Debt from review** — material non-blocking findings don't die in
+  acceptance notes: each one becomes a `new` debt task linked from the note.
+  "We'll wire it later" without a tracked task does not exist.
+- **Vacuous-pass control** — a green test is not evidence: a new guard test
+  must be shown to FAIL without the fix. "Tests are green but the protection
+  silently died" is an unconditional return.
+- **Reviewer envelope** — review is refutation, not summary: the change is
+  framed as a claim to attack, with hunt categories per change type and a
+  CONFIRMED (file:line) / NO FINDINGS verdict per category.
+- **Merge review** — the orchestrator's own merge/fixup commits are reviewed
+  by a reading subagent, not their author: no single executor ever saw the
+  merged result.
+- **Hypothesis labeling** — unverified context in a spec is marked as a
+  hypothesis ("likely X — verify before relying"), never stated as fact.
+
+Considered and deferred: cross-vendor review (Codex read-only vs a
+Claude-driven pipeline) — candidate escalation for high-risk tasks.
 
 ## Token economics
 
