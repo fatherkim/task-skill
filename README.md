@@ -7,6 +7,21 @@ coding subagents. No GitHub Issues, no external dependencies.
 *Русская версия: [README.ru.md](README.ru.md). Skill docs (SKILL.md, DESIGN.md)
 are in Russian.*
 
+## What's new (2026-07-04)
+
+- **`/task-multi` skill** — multiple orchestrators in parallel on one repository:
+  each in its own git worktree, shared tracker via a service branch `task-sync`
+  (checkout-less 3-way merge), global flock mutex, owner+worktree guard, atomic
+  `new` (a task is born as a commit on the branch), mutex-guarded `merge-main`
+  with auto-fallback to `integration` and a `--resolve` worktree for conflicts.
+- **Base CLI upgrade** (after a code-level survey of Backlog.md/GNAP/taskplane etc. —
+  see `analysis_task_competitors_2026-07-04.md`): `return` + `## Runs` attempt log
+  + circuit breaker (3 returns = stop), `ready --waves` (parallel dispatch waves +
+  dependency cycle detection), `new --risk 0..3` mapped to review depth, `_SCHEMA`
+  tracker version gate, autonomy levels, a hard ban on nested subagent spawning
+  in the envelopes. Docs are in Russian: `update_task_multi_2026-07-04.md`,
+  spec `impl_spec_task_upgrade_2026-07-04.md`.
+
 ## What's inside
 
 ```
