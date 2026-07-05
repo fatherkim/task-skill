@@ -7,6 +7,36 @@ coding subagents. No GitHub Issues, no external dependencies.
 *Русская версия: [README.ru.md](README.ru.md). Skill docs (SKILL.md, DESIGN.md)
 are in Russian.*
 
+## What's new (2026-07-05, v1.2.0)
+
+- **Hardening waves 1–2**: `doctor` (12 tracker self-checks) + `RECOVERY.md`
+  (anchored repair recipes) + `QUICKREF.md`; enforced status lifecycle
+  (`close` only from `in_progress`, `block`/`unblock` guards); `return`
+  feedback dedup; `--debt-from` for spawning debt tasks; multi-repo
+  `sync_rules` export; a ~330-check test stand (`scripts/tests/run.sh`).
+- **Wave 3 (borrowed from Mahler-the-orchestrator, reworked)**:
+  - *Report-to-file*: executors and reviewers write full reports to a
+    gitignored `.reports/` dir; the chat message is a ≤15-line digest. Survives
+    agent and session death; `RECOVERY.md#agent-death` gives the respawn recipe.
+  - *3-step escalation ladder* on acceptance failure: same executor + verbatim
+    finding list → respawn one model/effort tier up (context rebuilt from
+    artifacts: spec, branch, reports, reviewer diagnosis) → block + diagnosis.
+    Mahler's "same agent, higher effort" step is impossible in this harness
+    (effort is fixed at spawn), so their 4 steps collapse into 3.
+  - *Grounding gate for synthesis tasks*: specs must name the deepest available
+    source; every claim carries a pointer checked against it; two derivatives
+    of one source agreeing is not verification. Reviewers get a third hunt
+    category ({synthesis/docs}: connective-tissue words, pointers, sources).
+  - *Judgment boundary*: reading/scout subagents find, list, measure, quote —
+    they never choose, recommend or rank; the orchestrator re-derives decisions.
+  - *Wave plan-stop*: a task/model/depends/parallel table goes to the user for
+    approval before dispatching a wave.
+  - *Role→model/effort table* (outside the core): cheapest reliable model per
+    role, escalation = one step right; the reviewer is never weaker than the
+    coder of the same task.
+  - *Spec-ahead check*: before dispatching a pre-written spec, verify the
+    accepted diffs of the wave didn't break its anchors.
+
 ## What's new (2026-07-04)
 
 - **`/task-multi` skill** — multiple orchestrators in parallel on one repository:
@@ -26,9 +56,12 @@ are in Russian.*
 .claude/skills/task/
 ├── SKILL.md              # the skill itself (canonical text)
 ├── DESIGN.md             # design log (why it is the way it is)
+├── QUICKREF.md           # one-page cheat sheet (top-5 mistakes, command map)
+├── RECOVERY.md           # anchored repair recipes (broken index, dead agent, ...)
 └── scripts/
-    ├── task.py           # tracker mini-CLI (new/list/start/close/verify/ready/stats/calibrate/archive)
-    └── sync_rules.py     # generates rules for Codex (AGENTS.md) and Cursor (.cursor/rules)
+    ├── task.py           # tracker mini-CLI (new/list/start/close/verify/ready/return/doctor/stats/calibrate/archive)
+    ├── sync_rules.py     # generates rules for Codex (AGENTS.md) and Cursor (.cursor/rules)
+    └── tests/            # test stand (~330 checks), run.sh
 ```
 
 ## Key ideas
@@ -155,6 +188,18 @@ Borrowed after a review-side analysis of
   dedicated "Adjacent findings (not fixed)" report section; material ones
   become tracked debt tasks. A spec "fact" that contradicts the live code is
   a blocker, not something to build on.
+- **Primary-source rule** — a synthesis task (guide, digest, wiki page) names
+  the deepest available source in its spec; every claim carries a pointer
+  verified against that source. Two derivatives of one source agreeing is one
+  voice, not two.
+- **Judgment boundary** — scout subagents are eyes, not the head: find / list /
+  measure / quote, never choose / recommend / rank. A returned recommendation
+  is raw material; the orchestrator re-derives the decision. (The reviewer
+  judges by mandate — it is the explicit exception.)
+- **Escalation ladder** — 1st failure: same executor, verbatim finding list
+  (file:line, expected/got); 2nd: respawn one tier up, context from artifacts;
+  3rd: block + diagnosis to the user, the pipeline continues on independent
+  tasks. The CLI counts returns; the circuit breaker trips on the third.
 
 Considered and deferred: cross-vendor review (Codex read-only vs a
 Claude-driven pipeline) — candidate escalation for high-risk tasks.
@@ -205,7 +250,10 @@ python3 agent_tasks/_cli.py list|index
 python3 agent_tasks/_cli.py start 0002
 python3 agent_tasks/_cli.py verify 0002 [--base main] [--allow tests/]
 python3 agent_tasks/_cli.py close 0002 --spent "sonnet(1):69k"
+python3 agent_tasks/_cli.py return 0002 --reason "..."   # send back, counts iterations
+python3 agent_tasks/_cli.py block 0002 --reason "..."    # / unblock
 python3 agent_tasks/_cli.py ready          # what can be taken without collisions
+python3 agent_tasks/_cli.py doctor         # 12 tracker self-checks
 python3 agent_tasks/_cli.py stats          # pipeline economics
 python3 agent_tasks/_cli.py calibrate --set "sonnet:23300,opus:18100"
 python3 agent_tasks/_cli.py archive 0001 --summary "..."  # or `archive --done`
