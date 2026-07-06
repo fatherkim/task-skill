@@ -1,7 +1,7 @@
 ---
 name: task-multi
 description: Мультиоркестраторный режим конвейера «руки-агенты»: несколько оркестраторов параллельно на одном git-репозитории, каждый в своём worktree, общий трекер через служебную ветку task-sync. Используй, когда пользователь хочет запустить второй/параллельный оркестратор, «мультиоркестратор», несколько сессий конвейера одновременно, или упоминает task-multi, multi-режим трекера, оркестратор в worktree. Use for running multiple task orchestrators in parallel on one repo via git worktrees and a synced tracker branch.
-version: 1.2.0
+version: 1.2.1
 ---
 
 # task-multi — несколько оркестраторов на одном репозитории
