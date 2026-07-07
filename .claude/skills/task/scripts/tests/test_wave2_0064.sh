@@ -19,7 +19,7 @@ echo "== Ф9: doctor печатает версию CLI =="
 # T1: версия печатается всегда (даже без каноника рядом).
 d="$(mk_repo)"
 out="$(cli "$d" doctor 2>&1)"
-assert_contains "$out" "CLI версия: 1.2.1" "T1 doctor печатает версию CLI"
+assert_contains "$out" "CLI версия: 1.2.2" "T1 doctor печатает версию CLI"
 rm -rf "$d"
 
 echo "== Ф9: doctor ловит рассинхрон копии tasks/_cli.py с каноником =="
@@ -58,8 +58,8 @@ rm -rf "$d"
 
 echo "== Ф9: version: во frontmatter обоих SKILL.md; _SCHEMA не тронута =="
 
-assert_contains "$(cat "$HERE/../../SKILL.md")" $'\nversion: 1.2.1\n' "T5 task/SKILL.md несёт version: 1.2.1"
-assert_contains "$(cat "$HERE/../../../task-multi/SKILL.md")" $'\nversion: 1.2.1\n' "T5 task-multi/SKILL.md несёт version: 1.2.1"
+assert_contains "$(cat "$HERE/../../SKILL.md")" $'\nversion: 1.2.2\n' "T5 task/SKILL.md несёт version: 1.2.2"
+assert_contains "$(cat "$HERE/../../../task-multi/SKILL.md")" $'\nversion: 1.2.2\n' "T5 task-multi/SKILL.md несёт version: 1.2.2"
 # grep-ассерт: SCHEMA_VERSION не менялся этой задачей (значение 2, как в волне 1/2 до 0064).
 schema_line="$(grep -m1 '^SCHEMA_VERSION = ' "$TASK_PY")"
 assert_eq "$schema_line" "SCHEMA_VERSION = 2" "T5 _SCHEMA-константа (SCHEMA_VERSION) не изменена Ф9"
